@@ -4,15 +4,15 @@
 # mount point binding of courses is the main goal of the script
 
 
-# Usage:																		#
-# 	--------------------------------------------------------------------		#
-#        			./course_mount.sh {-h|-l|-m|-u} [-c COURSE]					#
-# 	--------------------------------------------------------------------		#
-#       	./course_mount.sh -h to print this help message						#
-# 		./course_mount.sh -l to list all the courses							#
-#        	./course_mount.sh -m -c [course] For mounting a given course		#
-#        	./course_mount.sh -u -c [course] For unmounting a given course		#
-#        	If course name is ommited all courses will be (un)mounted 			#
+# Usage:																		
+# 	--------------------------------------------------------------------		
+#        			./course_mount.sh {-h|-l|-m|-u} [-c COURSE]					
+# 	--------------------------------------------------------------------		
+#       	./course_mount.sh -h to print this help message						
+# 		./course_mount.sh -l to list all the courses							
+#        	./course_mount.sh -m -c [course] For mounting a given course		
+#        	./course_mount.sh -u -c [course] For unmounting a given course		
+#        	If course name is ommited all courses will be (un)mounted 			
 
 
 set -e
@@ -22,7 +22,7 @@ set -e
 
 BASE_DIR="/data/courses"
 MOUNT_BASE_DIR="/home/trainee/courses"
-COURSES=$(cat /home/trainee/courses.txt)
+COURSES=$(cat /home/trainee/courses.list)
 OPTYPE=
 COURSENAME=
 ORIGINAL_DIR=
@@ -36,7 +36,7 @@ usage() {
        			./course_mount.sh {-h|-l|-m|-u} [-c COURSE]
 	--------------------------------------------------------------------
       	./course_mount.sh -h to print this help message
-		./course_mount.sh -l to list all the courses
+       	./course_mount.sh -l to list all the courses
        	./course_mount.sh -m -c [course] For mounting a given course
        	./course_mount.sh -u -c [course] For unmounting a given course
        	If course name is ommited all courses will be (un)mounted 
@@ -44,15 +44,21 @@ usage-end
 	exit $1
 }
 
-# function to list all the courses
+# function to list all the courses and display if they are mounted
 list_courses() {
 	IND=1
-	echo SNo. $'\t' COURSE			# headers
+	echo "SNo. | COURSE | MOUNTED" > /tmp/trainee_course_mount.list		# headers
 	for COURSE in ${COURSES[*]}
 	do
-		echo ${IND}. $'\t' $COURSE
+		MOUNT_DIR=$MOUNT_BASE_DIR/$COURSE
+		ORIGINAL_DIR=$BASE_DIR/$COURSE
+		IS_MOUNTED=no
+		[[ $(check_mount) -eq 0 ]] && IS_MOUNTED=yes
+		# echo ${IND}. $'\t' $COURSE $'\t\t' $IS_MOUNTED
+		echo "${IND}. | $COURSE | $IS_MOUNTED" >> /tmp/trainee_course_mount.list
 		(( IND=$IND+1 ))
 	done
+	cat /tmp/trainee_course_mount.list | column -t -s '|'
 	exit 0
 }
 
@@ -60,12 +66,7 @@ list_courses() {
 # usage should be as a subshel function only
 check_mount() {
     # Return 0 if mount exists 1 if not exists
-	if [[ $(mount | grep "${ORIGINAL_DIR} on ${MOUNT_DIR} ") ]]
-	then
-		echo 0
-	else
-		echo 1
-	fi
+	[[ $(mount | grep "${ORIGINAL_DIR} on ${MOUNT_DIR} ") ]] && echo 0 || echo 1
 }
 
 # function for mount a course
@@ -80,12 +81,8 @@ mount_course() {
 			break
 		fi
 	done
-	# echo $IS_COURSE
-	if [[ $IS_COURSE -eq 0 ]]
-	then
-		echo "course doen't exist"
-		exit 1
-	fi
+	# if not a course exit with 1
+	[[ $IS_COURSE -eq 0 ]] && echo "course doen't exist" && exit 1
     # Check if the mount is already exists
 	MOUNT_DIR=$MOUNT_BASE_DIR/$COURSENAME
 	ORIGINAL_DIR=$BASE_DIR/$COURSENAME
@@ -126,12 +123,8 @@ unmount_course() {
 			break
 		fi
 	done
-	# echo $IS_COURSE
-	if [[ $IS_COURSE -eq 0 ]]
-	then
-		echo "course doesn't exist"
-		exit 1
-	fi
+	# if not a course exit with 1
+	[[ $IS_COURSE -eq 0 ]] && echo "course doen't exist" && exit 1
     # Check if mount exists
 	MOUNT_DIR=$MOUNT_BASE_DIR/$COURSENAME
 	ORIGINAL_DIR=$BASE_DIR/$COURSENAME
@@ -159,17 +152,17 @@ unmount_all() {
 # processing the options and assigning arguments to variables
 while getopts "hlmuc:" opt
 do
-       	case $opt in
+    case $opt in
 		"h") [[ -n ${OPTYPE} ]] || usage 0;;
 		"l") list_courses ;;
 		"m") [[ -n ${OPTYPE} ]] && usage 1 || OPTYPE=m ;;
 		"u") [[ -n ${OPTYPE} ]] && usage 1 || OPTYPE=u ;;
-		"c") [[ -n ${OPTARG} ]] && COURSENAME=${OPTARG} ||  usage ;;
-               	*) usage ;;
-       	esac
+		"c") [[ -n ${OPTARG} ]] && COURSENAME=${OPTARG} ||  usage 1;;
+        *) usage 1;;
+    esac
 done
 
-[[ -z ${OPTYPE} ]] && usage
+[[ -z ${OPTYPE} ]] && usage 1
 
 # echo enroll -$OPTYPE -c $COURSENAME
 
